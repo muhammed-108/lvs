@@ -1,0 +1,51 @@
+Step 1 Configure Nginx1 and Nginx2.
+The configuration method is the same as that in the previous lab.
+Additionally, perform network configuration on the two NGINX nodes.
+Run the following command to add VIP configurations:
+nmcli connection add type dummy ifname dummy2 ipv4.method manual ipv4.addresses 10.0.0.100/32
+Run the following commands to change the RIP gateway address to the router interface
+address:
+nmcli connection modify ens224 ipv4.gateway 10.0.0.1
+nmcli connection down ens224
+nmcli connection up ens224
+After the network configuration is complete, modify the ARP kernel parameters.
+cat >> /etc/sysctl.conf << EOF
+net.ipv4.conf.all.arp_ignore = 1
+net.ipv4.conf.all.arp_announce = 2
+net.ipv4.conf.dummy2.arp_ignore = 1
+net.ipv4.conf.dummy2.arp_announce = 2
+EOF
+
+
+
+Step 2 Preconfigure the LVS.
+If the LVS in the previous lab is reused in this lab, remove the existing configurations.
+Run the following command to delete the LVS configuration added in the preceding lab:
+ipvsadm -D -t 192.168.1.10:80
+After the deletion, run the following command to add VIP configurations:
+nmcli connection add type dummy ifname dummy2 ipv4.method manual ipv4.addresses 10.0.0.100/32
+Run the following commands to set the DIP gateway address to the router interface
+address:
+nmcli connection modify ipv4.gateway 10.0.0.1
+nmcli connection down ens224
+nmcli connection up ens224
+If the LVS is newly created, you only need to add the VIP configurations and change the
+gateway address.
+
+Step 3 Configure the LVS.
+If the LVS is newly created, install ipvsadm based on Step 3 in 1.1.3.
+Run the following commands to add required configurations:
+ipvsadm -A -t 10.0.0.100:80 -s rr
+ipvsadm -a -t 10.0.0.100:80 -r 10.0.0.3
+ipvsadm -a -t 10.0.0.100:80 -r 10.0.0.2
+Verify the configuration. Information in the following figure is displayed:
+ipvsadm -Ln
+
+
+Step 4 Check the LVS configuration.
+Log in to the client ECS, use the LVS VIP to repeatedly access the web service. The
+following information is displayed:
+It shows that the LVS forwards the requests to Nginx1 and Nginx2 in round robin mode
+and returns the page to the client.
+
+
