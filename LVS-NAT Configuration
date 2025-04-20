@@ -1,0 +1,63 @@
+bo danani ip zyada yan ip bait baw interface
+
+Step 1 Configure Nginx1 and Nginx2.
+Set the gateway of Nginx1 and Nginx2 to the LVS DIP according to the preceding
+figure. Command example:
+nmcli con mod ens224 ipv4.address 10.0.0.2/24 ipv4.gateway 10.0.0.10
+nmcli con down ens224 & nmcli con up ens224
+
+
+Step 2 Preconfigure the LVS.
+Configure two NICs for the LVS ECS, one for the VIP and the other for the DIP. The DIP is
+an intranet IP address and does not need a gateway. The VIP is a public IP address and
+needs to be configured with gateway information. In addition, to ensure normal IP
+forwarding, disable the Source/Destination Check item, as shown in the following
+figure.
+Enable the IP forwarding function on the LVS ECS.
+[root@Cluster1 ~]# sed -i "s/ip_forward=0/ip_forward=1/g" /etc/sysctl.conf
+[root@Cluster1 ~]# sysctl -p | grep net.ipv4.ip_forward
+net.ipv4.ip_forward = 1
+[root@Cluster1 ~]# sysctl -a | grep net.ipv4.ip_forward
+net.ipv4.ip_forward = 1
+
+
+Step 3 Install and configure the LVS.
+On the LVS, run the following command to install ipvsadm:
+[root@Cluster1 ~]# yum install -y ipvsadm
+After the installation is complete, create a configuration file required for starting
+ipvsadm.
+[root@Cluster1 ~]# touch /etc/sysconfig/ipvsadm
+If the service is started properly, run the following command to create a cluster using the
+round robin algorithm:
+[root@Cluster1 ~]# ipvsadm -A -t 192.168.1.10:80 -s rr
+Add Nginx1 and Nginx2 as backend real servers, or RSs.
+[root@Cluster1 ~]# ipvsadm -a -t 192.168.1.10:80 -r 10.0.0.2 -m
+[root@Cluster1 ~]# ipvsadm -a -t 192.168.1.10:80 -r 10.0.0.3 -m
+Check whether the configuration takes effect.
+[root@Cluster1 ~]# ipvsadm -Ln
+IP Virtual Server version 1.2.1 (size=4096)
+Prot LocalAddress:Port Scheduler Flags
+ -> RemoteAddress:Port Forward Weight ActiveConn InActConn
+TCP 192.168.1.10:80 rr
+ -> 10.0.0.2:80 Masq 1 0 0
+ -> 10.0.0.3:80 Masq 1 0 0
+
+Step 4 Check the LVS configuration.
+On the ECS where the LVS resides, use the LVS VIP to repeatedly access the web service.
+The following information is displayed:
+
+
+Step 1 Modify the LVS configuration.
+Run the following command to change the LVS algorithm to weighted round robin:
+[root@Cluster1 ~]# ipvsadm -E -t 192.168.1.10:80 -s wrr
+
+
+Step 2 Change the weights of the two RSs.
+Change the weight of Nginx1 to 2.
+[root@Cluster1 ~]# ipvsadm -e -t 192.168.1.10:80 -r 10.0.0.2 -m -w 2
+Step 3 Check the LVS configuration.
+Log in to the client ECS, use the LVS VIP to repeatedly access the web service. The
+following information is displayed:
+curl ipofcluster
+
+
